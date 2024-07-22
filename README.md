@@ -10,8 +10,23 @@
 ### app-custom-ragchain : 추상화를 조금 덜어낸 업그레이드 버전
 
 - load_qa_chain 사용안했음
+- 그런데 ragchain에 answer, context를 하나로 만들어버리면 streaming이 어려움
+- 그래서 ragchain에서는 일단 결과를 answer만 나오게 하고, 나머지를 별도로 저장해야 streaming은 쉬워짐
 
 ### runnablepassthrough-assign.py
 
 - : input 자체도 chain의 결과로 보내주기 위해서는 .assign을 해줘서 dictionary를 관리하는 형태로 해줘야 함
 - rag chain에서는 결국 질문, 컨텍스트, 정답 이 3가지 모두가 chain의 결과물로 호출되어야 하기 때문에 runnablepassthrough.assign이 많이 활용됨 (아니면 load_qa_chain 처럼 이미 그 로직이 내장되어 있거나)
+
+### summarize-pdf-nonstream.py
+
+- 가장 간단한 형태의 요약 앱, 심지어 stream도 안됨
+
+### summarize-pdf-stream.py
+
+- 한단계 더 나아간 요약앱, langchain의 구조를 활용해서 stream이 됨
+- invoke 대신 stream, write 대신 write_stream을 이용하면 됨
+
+### summarize-pdf-withoptions.py
+
+- 여러 옵션 중에서 선택 가능
