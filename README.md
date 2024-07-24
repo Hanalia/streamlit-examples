@@ -13,6 +13,10 @@
 - 그런데 ragchain에 answer, context를 하나로 만들어버리면 streaming이 어려움
 - 그래서 ragchain에서는 일단 결과를 answer만 나오게 하고, 나머지를 별도로 저장해야 streaming은 쉬워짐
 
+### custom-rag-langchain : 너무 assign을 이용해서 chain만 쓰려고 하다보니까 stream 기능이 없음
+- 그래서 기능의 분화 (main chain에서는 answer 만 나오도록 함)를 통해 stream 달성
+
+
 ### runnablepassthrough-assign.py
 
 - : input 자체도 chain의 결과로 보내주기 위해서는 .assign을 해줘서 dictionary를 관리하는 형태로 해줘야 함
