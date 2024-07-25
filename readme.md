@@ -46,3 +46,4 @@ pip freeze > requirements.txt
 발전된 형태가 custom-ragchain-stream-meta
 
 - 여기서 한단계 더 발전한 형태가 rag-with-pdf.py
+- 일단 최선은 stream 기능 포기하는 대신에 cache 해서 페이지 navigation 가능하도록

@@ -64,7 +64,8 @@ def get_rag_chain() -> Runnable:
 
 def display_pdf_page(image: Image.Image, page_number: int, total_pages: int) -> None:
     st.image(image, use_column_width=True, caption=f"Page {page_number}")
-    st.write(f"Page {page_number} of {total_pages}")
+    # st.write(f"Page {page_number} of {total_pages}")
+    # st.markdown(f"<div style='text-align: center;'>Page {page_number} of {total_pages}</div>", unsafe_allow_html=True)
 
 def save_uploaded_file(uploaded_file: BinaryIO) -> str:
     with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as temp_file:
@@ -74,31 +75,35 @@ def save_uploaded_file(uploaded_file: BinaryIO) -> str:
 def convert_pdf_to_images(pdf_path: str) -> List[Image.Image]:
     return convert_from_path(pdf_path)
 
-def process_input(user_question):
+@st.cache_data
+def process_question(user_question):
     embeddings = OpenAIEmbeddings(model="text-embedding-3-small")
     new_db = FAISS.load_local("faiss_index", embeddings, allow_dangerous_deserialization=True)
     retriever = new_db.as_retriever(search_kwargs={"k": 2})
 
     retrieve_docs = retriever.invoke(user_question)
     chain = get_rag_chain()
-    response = chain.stream({"question": user_question, "context": retrieve_docs})
+    response = chain.invoke({"question": user_question, "context": retrieve_docs})
 
-    st.write_stream(response)
-    for idx, doc in enumerate(retrieve_docs):
-        with st.expander("Evidence context"):
-            st.write(doc.page_content)
-            file_path = doc.metadata.get('source', '')
-            page_number = doc.metadata.get('page', 0)
-            if file_path and page_number:
-                button_key = f"link_{file_path}_{page_number}_{idx}"  # Add idx to make the key unique
-                if st.button(f"🔎 {os.path.basename(file_path)} pg.{page_number}", key=button_key):
-                    st.query_params['page'] = str(page_number)
-                    st.query_params['file'] = file_path
-                    st.rerun()
+    return response, retrieve_docs
+
+
 
 def main():
     st.set_page_config("Chat with PDF", layout="wide")
     st.header("Chat with PDF using ChatGPT💁")
+
+    # Initialize session state
+    if "uploaded_files" not in st.session_state:
+        st.session_state.uploaded_files = []
+    if "page_number" not in st.session_state:
+        st.session_state.page_number = 1
+    if "images" not in st.session_state:
+        st.session_state.images = []
+    if "response" not in st.session_state:
+        st.session_state.response = None
+    if "context" not in st.session_state:
+        st.session_state.context = []
 
     # Create two columns
     left_column, right_column = st.columns([1, 1])
@@ -115,27 +120,64 @@ def main():
                 with st.spinner("Vector DB creating"):
                     get_vector_store(smaller_documents)
                     st.success("Done")
+                st.session_state.uploaded_files = pdf_docs
 
         user_question = st.text_input("Ask a question about the uploaded PDF",
                                       placeholder="Summarize this document, please")
 
+        # if user_question:
+        #     process_input(user_question)
+
         if user_question:
-            process_input(user_question)
+            response, context = process_question(user_question)
+            st.session_state.response = response
+            st.session_state.context = context
+
+        if st.session_state.response:
+            st.write(st.session_state.response)
+            for idx, doc in enumerate(st.session_state.context):
+                with st.expander("Evidence context"):
+                    st.write(doc.page_content.replace("$", r"\$"))
+                    print(doc.metadata)
+                    file_path = doc.metadata.get('source', '')
+                    page_number = doc.metadata.get('page', 0) + 1
+                    if file_path and page_number:
+                        button_key = f"link_{file_path}_{page_number}_{idx}"  # Add idx to make the key unique
+                        if st.button(f"🔎 {os.path.basename(file_path)} pg.{page_number}", key=button_key):
+                            st.session_state.page = str(page_number)
+                            st.session_state.file = file_path
+                            st.rerun()
 
     with right_column:
         # Safely get query parameters
-        page = st.query_params.get('page')
-        file = st.query_params.get('file')
-        
-        if file and page:
+        file = st.session_state.get('file')
+        page_number = st.session_state.get('page_number')
+
+        if file and page_number:
             try:
-                page_number = int(page)
-                images = convert_pdf_to_images(file)
+                page_number = int(page_number)
+                if st.session_state.images == [] or st.session_state.images[0][0] != file:
+                    images = convert_pdf_to_images(file)
+                    st.session_state.images = (file, images)
+                else:
+                    images = st.session_state.images[1]
                 total_pages = len(images)
                 display_pdf_page(images[page_number - 1], page_number, total_pages)
+
+                # Add pagination buttons in a single row
+                prev_col, _, next_col = st.columns([1, 5, 1])
+                with prev_col:
+                    if page_number > 1:
+                        if st.button("Prev Page"):
+                            st.session_state.page_number = page_number - 1
+                            st.rerun()
+                with next_col:
+                    if page_number < total_pages:
+                        if st.button("Next Page"):
+                            st.session_state.page_number = page_number + 1
+                            st.rerun()
             except (ValueError, IndexError, FileNotFoundError) as e:
                 st.error(f"Error displaying PDF page: {str(e)}")
 
 if __name__ == "__main__":
     main()
-
