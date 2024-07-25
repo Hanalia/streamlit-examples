@@ -54,8 +54,7 @@ def get_rag_chain():
     model = ChatOpenAI(model="gpt-4o-mini")
 
     rag_chain_from_docs = (
-        {"context": RunnablePassthrough(), "question": RunnablePassthrough()}
-        | custom_rag_prompt
+        custom_rag_prompt
         | model
         | StrOutputParser()
     )
@@ -64,7 +63,7 @@ def get_rag_chain():
     
 
 
-def user_input(user_question):
+def user_input(user_question: str) -> None:
 
     ## retriever 정의 후
 
@@ -73,7 +72,6 @@ def user_input(user_question):
     retriever = new_db.as_retriever()
 
     retrieve_docs = retriever.invoke(user_question)
-
 
     chain = get_rag_chain()
     response = chain.stream({"question":user_question,"context" :retrieve_docs})
